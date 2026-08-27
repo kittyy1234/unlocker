@@ -1,6 +1,6 @@
 #!/bin/bash
 
-swift main.swift &
+./main.sh &
 ENGINE_PID=$!
 
 while true; do
