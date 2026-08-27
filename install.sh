@@ -66,19 +66,16 @@ trap cleanup EXIT INT TERM
 
 banner
 
-spinner_start "Killing old roblox"
+spinner_start "Killing old display configs and roblox"
 pkill -f "launcher.sh" 2>/dev/null || true
 pkill -f "main.sh" 2>/dev/null || true
+pkill -f "display_daemon" 2>/dev/null || true
 sleep 0.4
-spinner_stop ok "Killing old roblox"
-
-spinner_start "killed..."
-sleep 0.4
-spinner_stop ok "killed..."
+spinner_stop ok "Killing old configurations"
 
 GITHUB_USERNAME="kittyy1234"
 REPO_NAME="unlocker"
-REPO_RAW="https://raw.githubusercontent.com/kittyy1234/unlocker/main"
+REPO_RAW="https://githubusercontent.com"
 INSTALL_DIR="$HOME/.custom_360hz"
 
 spinner_start "downloading files..."
@@ -92,9 +89,54 @@ curl -fsSL "$REPO_RAW/launcher.sh" -o launcher.sh || handle_fail "download faile
 chmod +x main.sh uncap_fps.sh launcher.sh 2>/dev/null || handle_fail "failed permissions configuration"
 spinner_stop ok "done"
 
-spinner_start "finalizing"
-sleep 0.3
-spinner_stop ok "finalizing"
+spinner_start "compiling virtual display engine for silicon..."
+cat << 'EOF' > display.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+#include <CoreFoundation/CoreFoundation.h>
+
+typedef void* (*CreateDescFn)(void);
+typedef int (*SetSettingsFn)(void*, void*);
+typedef void* (*CreateDisplayFn)(void);
+typedef void* (*CreateSettingsFn)(void);
+typedef int (*AddModeFn)(void*, uint32_t, uint32_t, double);
+
+int main() {
+    void* handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY);
+    if (!handle) return 1;
+
+    CreateDescFn cDesc = (CreateDescFn)dlsym(handle, "CGVirtualDisplayDescriptorCreate");
+    SetSettingsFn sSettings = (SetSettingsFn)dlsym(handle, "CGVirtualDisplayDescriptorSetSettings");
+    CreateDisplayFn cDisplay = (CreateDisplayFn)dlsym(handle, "CGVirtualDisplayCreate");
+    CreateSettingsFn cSettings = (CreateSettingsFn)dlsym(handle, "CGVirtualDisplaySettingsCreate");
+    AddModeFn aMode = (AddModeFn)dlsym(handle, "CGVirtualDisplaySettingsAddMode");
+
+    if (!cDesc || !sSettings || !cDisplay || !cSettings || !aMode) return 1;
+
+    void* desc = cDesc();
+    void* settings = cSettings();
+    if (!desc || !settings) return 1;
+
+    aMode(settings, 1920, 1080, 360.0);
+    sSettings(desc, settings);
+
+    void* display = cDisplay(desc);
+    if (!display) return 1;
+
+    CFRunLoopRun();
+    return 0;
+}
+EOF
+
+gcc -O3 display.c -o display_daemon -framework CoreFoundation -framework CoreGraphics 2>/dev/null || handle_fail "compiler execution block error"
+rm display.c
+spinner_stop ok "engine compiled"
+
+spinner_start "finalizing display framework"
+./display_daemon &
+sleep 1.5
+spinner_stop ok "virtual screen active (1920x1080)"
 
 spinner_start "build complete"
 sleep 0.2
@@ -107,5 +149,3 @@ printf "ᗢ developed by kittyy123 :3\n"
 echo ""
 
 ./launcher.sh
-
-#mog
