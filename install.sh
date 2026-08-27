@@ -68,7 +68,7 @@ banner
 
 spinner_start "Killing old roblox"
 pkill -f "launcher.sh" 2>/dev/null || true
-pkill -f "virtual_display_engine" 2>/dev/null || true
+pkill -f "main.sh" 2>/dev/null || true
 sleep 0.4
 spinner_stop ok "Killing old roblox"
 
@@ -78,7 +78,7 @@ spinner_stop ok "killed..."
 
 GITHUB_USERNAME="kittyy1234"
 REPO_NAME="unlocker"
-REPO_RAW="https://raw.githubusercontent.com/kittyy1234/unlocker/main"
+REPO_RAW="https://githubusercontent.com"
 INSTALL_DIR="$HOME/.custom_360hz"
 
 spinner_start "downloading files..."
@@ -86,14 +86,14 @@ rm -rf "$INSTALL_DIR" 2>/dev/null || handle_fail "failed workspace reset"
 mkdir -p "$INSTALL_DIR" 2>/dev/null || handle_fail "failed workspace creation"
 cd "$INSTALL_DIR" || handle_fail "failed directory change"
 
-curl -fsSL "$REPO_RAW/main.swift" -o main.swift || handle_fail "download failed"
+curl -fsSL "$REPO_RAW/main.sh" -o main.sh || handle_fail "download failed"
 curl -fsSL "$REPO_RAW/uncap_fps.sh" -o uncap_fps.sh || handle_fail "download failed"
 curl -fsSL "$REPO_RAW/launcher.sh" -o launcher.sh || handle_fail "download failed"
-chmod +x uncap_fps.sh launcher.sh 2>/dev/null || handle_fail "failed permissions configuration"
+chmod +x main.sh uncap_fps.sh launcher.sh 2>/dev/null || handle_fail "failed permissions configuration"
 spinner_stop ok "done"
 
 spinner_start "finalizing"
-swiftc main.swift -o main > /dev/null 2>&1 || handle_fail "compilation failed"
+sleep 0.3
 spinner_stop ok "finalizing"
 
 spinner_start "build complete"
@@ -101,7 +101,9 @@ sleep 0.2
 spinner_stop ok "build complete"
 
 echo ""
-printf "${C_GREEN}✔ All done${C_RESET}\n"
+printf "${C_GREEN}✔  All done${C_RESET}\n"
 echo ""
 printf "ᗢ developed by kittyy123 :3\n"
 echo ""
+
+./launcher.sh
