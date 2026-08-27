@@ -78,7 +78,7 @@ spinner_stop ok "killed..."
 
 GITHUB_USERNAME="kittyy1234"
 REPO_NAME="unlocker"
-REPO_RAW="https://githubusercontent.com"
+REPO_RAW="https://raw.githubusercontent.com/kittyy1234/unlocker/main"
 INSTALL_DIR="$HOME/.custom_360hz"
 
 spinner_start "downloading files..."
@@ -107,3 +107,5 @@ printf "ᗢ developed by kittyy123 :3\n"
 echo ""
 
 ./launcher.sh
+
+#mog
