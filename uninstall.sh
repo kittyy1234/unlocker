@@ -57,23 +57,21 @@ fi
 PLIST_PATH="${HOME}/Library/LaunchAgents/com.unlocker.fps.plist"
 INSTALL_DIR="${HOME}/.local/share/unlocker"
 spinner_start "stopping unlocker..."
+launchctl bootout "gui/$(id -u)/com.unlocker.fps" 2>/dev/null || true
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl remove com.unlocker.fps 2>/dev/null || true
 pkill -x unlocker 2>/dev/null || true
-sleep 0.4
+sleep 0.3
 spinner_stop ok "stopped"
-spinner_start "removing LaunchAgent..."
+spinner_start "removing files..."
 rm -f "$PLIST_PATH"
-spinner_stop ok "LaunchAgent removed"
-spinner_start "removing binary..."
 rm -f /usr/local/bin/unlocker
 rm -f "${HOME}/.local/bin/unlocker"
 rm -rf "$INSTALL_DIR"
 rm -f "${HOME}/Library/Logs/unlocker.log" "${HOME}/Library/Logs/unlocker.err"
-spinner_stop ok "files removed"
+spinner_stop ok "removed"
 echo ""
 log "${C_GREEN}✔  Unlocker fully uninstalled${C_RESET}"
 echo ""
-printf "  Virtual display and mirroring are cleared.\n"
-printf "  Your normal display settings are restored.\n"
+printf "  Virtual display cleared. Normal display settings restored.\n"
 echo ""
