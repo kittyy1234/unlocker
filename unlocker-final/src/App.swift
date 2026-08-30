@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var pollTimer: Timer?
     private var robloxTimer: Timer?
     private var displayActive = false
+    private let displayQueue = DispatchQueue(label: "com.unlocker.displayQueue", qos: .userInteractive, attributes: .concurrent)
 
     init(showMenu: Bool, width: Int? = nil, height: Int? = nil, refreshRate: Double = 500, watchRoblox: Bool = true) {
         self.showMenu = showMenu
@@ -86,7 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hz = refreshRate
 
         let descriptor = CGVirtualDisplayDescriptor()
-        descriptor.setDispatchQueue(.main)
+        descriptor.setDispatchQueue(displayQueue)
         descriptor.name = "Unlocker \(Int(hz))Hz"
         descriptor.maxPixelsWide = UInt32(w * scale)
         descriptor.maxPixelsHigh = UInt32(h * scale)
@@ -104,6 +105,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settings.hiDPI = isNative && scale > 1 ? 1 : 0
         settings.modes = [
             CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: hz),
+            CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 480),
             CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 360),
             CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 240),
             CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 120),
@@ -220,10 +222,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 private extension NSScreen {
     var physicalSizeInMillimeters: CGSize {
         guard let dpi = deviceDescription[NSDeviceDescriptionKey("NSDeviceResolution")] as? NSValue else {
-            return CGSize(width: 600, height: 340)
+            return CGSize(width: 345, height: 215)
         }
         let d = dpi.sizeValue
-        guard d.width > 0, d.height > 0 else { return CGSize(width: 600, height: 340) }
+        guard d.width > 0, d.height > 0 else { return CGSize(width: 345, height: 215) }
         return CGSize(width: frame.width / d.width * 25.4, height: frame.height / d.height * 25.4)
     }
 }
