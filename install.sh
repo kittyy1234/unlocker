@@ -54,70 +54,117 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     log "${C_RED}This installer only runs on macOS.${C_RESET}"
     exit 1
 fi
-INSTALL_DIR="${HOME}/.local/share/unlocker"
-BIN_DIR="/usr/local/bin"
-LAUNCH_AGENTS="${HOME}/Library/LaunchAgents"
-PLIST_NAME="com.unlocker.fps.plist"
-PLIST_PATH="${LAUNCH_AGENTS}/${PLIST_NAME}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="${UNLOCKER_REPO:-kittyy1234/unlocker}"
 RATE="${UNLOCKER_RATE:-500}"
-spinner_start "checking build tools..."
-if ! xcode-select -p >/dev/null 2>&1; then
-    spinner_stop fail "Xcode Command Line Tools missing"
-    log "Install with: xcode-select --install"
-    exit 1
-fi
-if ! command -v swiftc >/dev/null 2>&1; then
-    spinner_stop fail "swiftc not found"
-    log "Install Xcode Command Line Tools: xcode-select --install"
-    exit 1
-fi
-spinner_stop ok "build tools ready"
+ARCH="$(uname -m)"
+case "$ARCH" in
+    arm64|aarch64) ARCH_TAG="arm64" ;;
+    x86_64|amd64)  ARCH_TAG="x86_64" ;;
+    *) ARCH_TAG="$ARCH" ;;
+esac
+BIN_NAME="unlocker-${ARCH_TAG}"
+INSTALL_DIR="${HOME}/.local/share/unlocker"
+BIN_DIR="${HOME}/.local/bin"
+LAUNCH_AGENTS="${HOME}/Library/LaunchAgents"
+PLIST_PATH="${LAUNCH_AGENTS}/com.unlocker.fps.plist"
+TMP="$(mktemp -d /tmp/unlocker-install.XXXXXX)"
+mkdir -p "$BIN_DIR" "$INSTALL_DIR" "$LAUNCH_AGENTS"
 spinner_start "stopping any running unlocker..."
+launchctl bootout "gui/$(id -u)/com.unlocker.fps" 2>/dev/null || true
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 pkill -x unlocker 2>/dev/null || true
-sleep 0.4
+sleep 0.3
 spinner_stop ok "stopped previous instances"
-spinner_start "building unlocker binary..."
-TMP="$(mktemp -d /tmp/unlocker-build.XXXXXX)"
-cp -R "${SCRIPT_DIR}/src" "$TMP/"
-cp "${SCRIPT_DIR}/Makefile" "$TMP/"
-cp "${SCRIPT_DIR}/unlocker.entitlements" "$TMP/"
-(
-    cd "$TMP" || exit 1
-    make build SIGN="-" 2>"$TMP/build.err"
-) || {
-    spinner_stop fail "build failed"
-    log "Build error:"
-    cat "$TMP/build.err" 2>/dev/null | tail -20
-    rm -rf "$TMP"
-    exit 1
-}
-if [[ ! -f "$TMP/.build/unlocker" ]]; then
-    spinner_stop fail "binary not produced"
+BINARY_PATH=""
+spinner_start "downloading prebuilt binary (${ARCH_TAG})..."
+DOWNLOAD_URL=""
+API="https://api.github.com/repos/${REPO}/releases/latest"
+if command -v curl >/dev/null 2>&1; then
+    ASSETS=$(curl -fsSL "$API" 2>/dev/null || true)
+    if [[ -n "$ASSETS" ]]; then
+        DOWNLOAD_URL=$(printf "%s" "$ASSETS" | grep -o "https://[^\"]*${BIN_NAME}[^\"]*" | head -1 || true)
+        if [[ -z "$DOWNLOAD_URL" ]]; then
+            DOWNLOAD_URL=$(printf "%s" "$ASSETS" | grep -o 'https://[^"]*unlocker[^"]*' | grep -v '\.sh' | head -1 || true)
+        fi
+    fi
+fi
+if [[ -z "$DOWNLOAD_URL" ]]; then
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BIN_NAME}"
+fi
+if curl -fsSL "$DOWNLOAD_URL" -o "$TMP/unlocker" 2>/dev/null && [[ -s "$TMP/unlocker" ]]; then
+    chmod +x "$TMP/unlocker"
+    if file "$TMP/unlocker" 2>/dev/null | grep -qi 'Mach-O\|executable'; then
+        BINARY_PATH="$TMP/unlocker"
+        spinner_stop ok "downloaded prebuilt binary"
+    else
+        rm -f "$TMP/unlocker"
+        BINARY_PATH=""
+        spinner_stop fail "download was not a valid binary"
+    fi
+else
+    spinner_stop fail "no prebuilt binary on Releases"
+fi
+if [[ -z "$BINARY_PATH" ]]; then
+    spinner_start "trying raw binary from repo..."
+    for path in "bin/${BIN_NAME}" "bin/unlocker" "dist/${BIN_NAME}" "dist/unlocker"; do
+        RAW="https://raw.githubusercontent.com/${REPO}/main/${path}"
+        if curl -fsSL "$RAW" -o "$TMP/unlocker" 2>/dev/null && [[ -s "$TMP/unlocker" ]]; then
+            chmod +x "$TMP/unlocker"
+            if file "$TMP/unlocker" 2>/dev/null | grep -qi 'Mach-O\|executable'; then
+                BINARY_PATH="$TMP/unlocker"
+                spinner_stop ok "downloaded from repo (${path})"
+                break
+            fi
+            rm -f "$TMP/unlocker"
+        fi
+    done
+    if [[ -z "$BINARY_PATH" ]]; then
+        spinner_stop fail "no binary in repo either"
+    fi
+fi
+if [[ -z "$BINARY_PATH" ]] && command -v swiftc >/dev/null 2>&1 && xcode-select -p >/dev/null 2>&1; then
+    spinner_start "building from source (tools already present)..."
+    SRC_ZIP="$TMP/src.zip"
+    if curl -fsSL "https://codeload.github.com/${REPO}/zip/refs/heads/main" -o "$SRC_ZIP" 2>/dev/null; then
+        unzip -q "$SRC_ZIP" -d "$TMP" 2>/dev/null || true
+        SRC_ROOT=$(find "$TMP" -maxdepth 1 -type d -name "unlocker-*" | head -1)
+        if [[ -z "$SRC_ROOT" ]]; then SRC_ROOT=$(find "$TMP" -maxdepth 2 -type d -name "src" | head -1 | xargs dirname 2>/dev/null); fi
+        if [[ -n "$SRC_ROOT" && -f "$SRC_ROOT/Makefile" ]]; then
+            (
+                cd "$SRC_ROOT" || exit 1
+                make build SIGN="-" >/dev/null 2>"$TMP/build.err"
+            ) && [[ -f "$SRC_ROOT/.build/unlocker" ]] && {
+                BINARY_PATH="$SRC_ROOT/.build/unlocker"
+                spinner_stop ok "built from source"
+            } || {
+                spinner_stop fail "source build failed"
+                [[ -f "$TMP/build.err" ]] && tail -15 "$TMP/build.err"
+            }
+        else
+            spinner_stop fail "source tree incomplete"
+        fi
+    else
+        spinner_stop fail "could not fetch source"
+    fi
+fi
+if [[ -z "$BINARY_PATH" || ! -f "$BINARY_PATH" ]]; then
+    echo ""
+    log "${C_RED}Could not get an unlocker binary.${C_RESET}"
+    log "Publish a Release asset named: ${BIN_NAME}"
+    log "  or put it at: bin/${BIN_NAME} on the main branch"
+    log "Releases: https://github.com/${REPO}/releases"
+    log "No Xcode install is required for users when a prebuilt binary is available."
     rm -rf "$TMP"
     exit 1
 fi
-spinner_stop ok "built unlocker"
 spinner_start "installing binary..."
-mkdir -p "$INSTALL_DIR" "$BIN_DIR" 2>/dev/null || true
-if ! cp "$TMP/.build/unlocker" "$BIN_DIR/unlocker" 2>/dev/null; then
-    mkdir -p "${HOME}/.local/bin"
-    cp "$TMP/.build/unlocker" "${HOME}/.local/bin/unlocker"
-    BIN_DIR="${HOME}/.local/bin"
-    export PATH="${BIN_DIR}:$PATH"
-fi
+cp "$BINARY_PATH" "${BIN_DIR}/unlocker"
 chmod +x "${BIN_DIR}/unlocker"
 xattr -cr "${BIN_DIR}/unlocker" 2>/dev/null || true
 xattr -d com.apple.quarantine "${BIN_DIR}/unlocker" 2>/dev/null || true
-codesign --force --sign - --entitlements "${SCRIPT_DIR}/unlocker.entitlements" "${BIN_DIR}/unlocker" 2>/dev/null || true
-cp -R "${SCRIPT_DIR}/src" "$INSTALL_DIR/" 2>/dev/null || true
-cp "${SCRIPT_DIR}/Makefile" "$INSTALL_DIR/" 2>/dev/null || true
-cp "${SCRIPT_DIR}/unlocker.entitlements" "$INSTALL_DIR/" 2>/dev/null || true
-rm -rf "$TMP"
+codesign --force --sign - "${BIN_DIR}/unlocker" 2>/dev/null || true
 spinner_stop ok "installed to ${BIN_DIR}/unlocker"
 spinner_start "installing LaunchAgent..."
-mkdir -p "$LAUNCH_AGENTS"
 cat > "$PLIST_PATH" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -143,23 +190,23 @@ cat > "$PLIST_PATH" <<EOF
 </dict>
 </plist>
 EOF
-launchctl unload "$PLIST_PATH" 2>/dev/null || true
-launchctl load "$PLIST_PATH" 2>/dev/null || true
-launchctl start com.unlocker.fps 2>/dev/null || true
-spinner_stop ok "LaunchAgent loaded (auto on login + Roblox watch)"
+launchctl bootout "gui/$(id -u)/com.unlocker.fps" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || launchctl load "$PLIST_PATH" 2>/dev/null || true
+launchctl kickstart -k "gui/$(id -u)/com.unlocker.fps" 2>/dev/null || launchctl start com.unlocker.fps 2>/dev/null || true
+spinner_stop ok "LaunchAgent loaded"
+rm -rf "$TMP"
 echo ""
 log "${C_GREEN}✔  Unlocker installed${C_RESET}"
 echo ""
-printf "  Binary:     ${BIN_DIR}/unlocker\n"
-printf "  Rate:       ${RATE} Hz (set UNLOCKER_RATE=360 before install to change)\n"
-printf "  Behavior:   creates virtual display when Roblox is open\n"
-printf "  Resolution: your normal display settings still work\n"
+printf "  Binary:     %s/unlocker\n" "$BIN_DIR"
+printf "  Rate:       %s Hz\n" "$RATE"
+printf "  Behavior:   virtual display when Roblox is open\n"
+printf "  PATH tip:   export PATH=\"%s:\$PATH\"\n" "$BIN_DIR"
 echo ""
-printf "  Manual:     unlocker --rate 500\n"
-printf "  Always on:  unlocker --always --rate 500\n"
-printf "  Quit agent: launchctl unload ~/Library/LaunchAgents/com.unlocker.fps.plist\n"
+printf "  Manual:     %s/unlocker --rate 500\n" "$BIN_DIR"
+printf "  Uninstall:  curl -fsSL https://raw.githubusercontent.com/%s/main/uninstall.sh | bash\n" "$REPO"
 echo ""
 printf "${C_GREEN}✔  All done${C_RESET}\n"
 echo ""
-printf "  Open Roblox → virtual ${RATE}Hz display activates automatically\n"
+printf "  Open Roblox → virtual %sHz display activates automatically\n" "$RATE"
 echo ""
