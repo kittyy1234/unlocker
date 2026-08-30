@@ -17,7 +17,7 @@ get_time() {
 log() { printf "%b %b\n" "$(get_time)" "$1"; }
 banner() {
     echo ""
-    printf "  ${C_BOLD}Unlocker Installer${C_RESET}  (macOS FPS unlock – virtual high-Hz display)\n"
+    printf "  ${C_BOLD}Fps Uncap Installer${C_RESET}"
     printf "${C_GRAY}────────────────────────────────────────────${C_RESET}\n"
     echo ""
 }
