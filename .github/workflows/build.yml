@@ -1,0 +1,24 @@
+name: Build Unlocker
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          make build SIGN="-"
+          mkdir -p dist
+          cp .build/unlocker dist/unlocker-arm64
+          file dist/unlocker-arm64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unlocker-arm64
+          path: dist/unlocker-arm64
