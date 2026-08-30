@@ -17,7 +17,7 @@ get_time() {
 log() { printf "%b %b\n" "$(get_time)" "$1"; }
 banner() {
     echo ""
-    printf "  ${C_BOLD}Installer${C_RESET}  (download only – no Xcode)\n"
+    printf "  ${C_BOLD}Unlocker Installer${C_RESET}  (download only – no Xcode)\n"
     printf "${C_GRAY}────────────────────────────────────────────${C_RESET}\n"
     echo ""
 }
@@ -54,33 +54,6 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     log "${C_RED}macOS only.${C_RESET}"
     exit 1
 fi
-
-ROBLOX_XML_DIR="${HOME}/Library/Roblox"
-ROBLOX_XML_PATH="${ROBLOX_XML_DIR}/GlobalBasicSettings_13.xml"
-mkdir -p "$ROBLOX_XML_DIR"
-
-spinner_start "patching roblox framing properties..."
-chflags nouchg "$ROBLOX_XML_PATH" 2>/dev/null || true
-
-if [[ ! -f "$ROBLOX_XML_PATH" ]]; then
-    cat << 'EOF' > "$ROBLOX_XML_PATH"
-<?xml version="1.0" encoding="UTF-8"?>
-<roblox version="1">
-    <int name="FramerateCap">999999999999</int>
-</roblox>
-EOF
-else
-    if grep -q "FramerateCap" "$ROBLOX_XML_PATH"; then
-        sed -i '' 's/<int name="FramerateCap">.*<\/int>/<int name="FramerateCap">999999999999<\/int>/' "$ROBLOX_XML_PATH"
-    else
-        sed -i '' '/<roblox[^>]*>/a\
-        <int name="FramerateCap">999999999999<\/int>' "$ROBLOX_XML_PATH"
-    fi
-fi
-
-chflags uchg "$ROBLOX_XML_PATH" 2>/dev/null || true
-spinner_stop ok "patched engine to 999999999999"
-
 REPO="${UNLOCKER_REPO:-kittyy1234/unlocker}"
 RATE="${UNLOCKER_RATE:-500}"
 ARCH="$(uname -m)"
@@ -199,3 +172,5 @@ echo ""
 printf "  %s/unlocker  – always-on virtual %s Hz\n" "$BIN_DIR" "$RATE"
 printf "  Open Roblox and check FPS.\n"
 echo ""
+
+#MOGGGGG
